@@ -432,6 +432,7 @@ class VirtualDAS:
     self.ff_model = FeedforwardModel()
     self.grade_estimator = GradeEstimator(dt=dt)
     self.prev_pedal_di = 0.0
+    self.regen_floor = REGEN_MAX
 
     self.inner_pid = PIDController(
       k_p=(VDAS_INNER_K_BP, VDAS_INNER_KP_V),
@@ -456,7 +457,8 @@ class VirtualDAS:
              a_ego: float = 0.0, freeze_integrator: bool = False,
              orientation_ned: list | None = None,
              accel_effort_limits: tuple[float, float] | None = None,
-             pedal_ramp_rate_up: float = PEDAL_RAMP_RATE_UP) -> float:
+             pedal_ramp_rate_up: float = PEDAL_RAMP_RATE_UP,
+             regen_floor: float = REGEN_MAX) -> float:
     """Compute pedal DI from acceleration command.
 
     Args:
@@ -468,6 +470,8 @@ class VirtualDAS:
       orientation_ned: [roll, pitch, yaw] from CC.orientationNED, or None
       accel_effort_limits: optional lower and upper acceleration-effort bounds
       pedal_ramp_rate_up: maximum positive pedal DI change for this update
+      regen_floor: decel the regen profile assumes full lift delivers (REGEN_MAX..0); negative
+        efforts are scaled by REGEN_MAX / regen_floor so the pedal reaches full lift at the floor
 
     Returns:
       pedal_di: output in DI units (caller converts to voltage via di_to_pedal)
@@ -483,6 +487,9 @@ class VirtualDAS:
       raise ValueError("acceleration-effort limits exceed the physical control range")
     if not 0.0 <= pedal_ramp_rate_up <= PEDAL_RAMP_RATE_UP:
       raise ValueError("pedal ramp limit exceeds the physical control range")
+    if not REGEN_MAX <= regen_floor < 0.0:
+      raise ValueError("regen floor outside the physical regen range")
+    self.regen_floor = regen_floor
 
     base_accel_effort = float(clip(
       a_limited + steady_grade_compensation + transient_pitch_compensation,
@@ -669,6 +676,9 @@ class VirtualDAS:
   def _feedforward(self, a_cmd: float, v_ego: float) -> float:
     """Map acceleration to raw pedal DI via the finite 2D lookup table."""
     zero_torque_di = get_zero_torque().get(v_ego)
+    if a_cmd < 0.0 and self.regen_floor != REGEN_MAX:
+      # only ever more lift (more regen) for the same decel request; never past the table's floor
+      a_cmd = max(a_cmd * REGEN_MAX / self.regen_floor, REGEN_MAX)
     return self.ff_model.get(a_cmd, v_ego, zero_torque_di)
 
   def _rate_limit(self, pedal_di: float, prev_pedal_di: float,

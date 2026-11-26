@@ -10,6 +10,7 @@ PREAP_FLAG_RADAR_EMULATION = 2
 from opendbc.car.tesla.preap.constants import (
   ACCEL_PREAP_BP, ACCEL_PREAP_PROFILES,
   PEDAL_LONG_K_BP, PEDAL_LONG_KI_V,
+  REGEN_PROFILES, REGEN_PROFILE_DEFAULT,
 )
 
 try:
@@ -17,6 +18,17 @@ try:
   _params = _Params()
 except ImportError:
   _params = None
+
+
+def get_regen_profile() -> tuple[float, float]:
+  """(full-lift regen floor m/s², overspeed gain) for NAPRegenProfile; standard on any bad value."""
+  profile = REGEN_PROFILE_DEFAULT
+  if _params is not None:
+    try:
+      profile = int(_params.get("NAPRegenProfile", return_default=True))
+    except (TypeError, ValueError):
+      pass
+  return REGEN_PROFILES.get(profile, REGEN_PROFILES[REGEN_PROFILE_DEFAULT])
 
 
 def get_preap_accel_limits(current_speed):
@@ -28,7 +40,7 @@ def get_preap_accel_limits(current_speed):
       pass
   profile = ACCEL_PREAP_PROFILES.get(personality, ACCEL_PREAP_PROFILES[1])
   a_max = float(np.interp(current_speed, ACCEL_PREAP_BP, profile))
-  return -1.5, a_max
+  return get_regen_profile()[0], a_max
 
 
 def get_preap_params(ret, fingerprint):

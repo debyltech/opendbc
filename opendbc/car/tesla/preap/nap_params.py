@@ -13,6 +13,7 @@ class NAPParamKeys:
   ADAPTIVE_ACCEL = "NAPAdaptiveAccel"
   PEDAL_ENABLED = "NAPPedalEnabled"
   FOLLOW_DISTANCE = "NAPFollowDistance"
+  REGEN_PROFILE = "NAPRegenProfile"
   # Pedal Hardware
   PEDAL_PROFILE = "NAPPedalProfile"
   PEDAL_CAN_BUS = "NAPPedalCanBus"
@@ -48,6 +49,7 @@ DEFAULTS = {
   NAPParamKeys.ADAPTIVE_ACCEL: True,
   NAPParamKeys.PEDAL_ENABLED: False,
   NAPParamKeys.FOLLOW_DISTANCE: 4,
+  NAPParamKeys.REGEN_PROFILE: 1,
   NAPParamKeys.PEDAL_PROFILE: 4,
   NAPParamKeys.PEDAL_CAN_BUS: 2,
   NAPParamKeys.PEDAL_CALIB_DONE: False,

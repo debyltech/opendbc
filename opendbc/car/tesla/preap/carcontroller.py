@@ -5,7 +5,8 @@ import numpy as np
 from opendbc.can import CANPacker
 from opendbc.car import Bus
 from opendbc.car.tesla.preap.nap_conf import nap_conf
-from opendbc.car.tesla.preap.interface import get_preap_accel_limits
+from opendbc.car.tesla.preap.interface import get_preap_accel_limits, get_regen_profile
+from opendbc.car.tesla.preap.constants import OVERSPEED_MARGIN
 from opendbc.car.tesla.pedal.controller import get_zero_torque, PEDAL_RAMP_RATE_UP
 from opendbc.car.tesla.preap.virtual_das import VirtualDAS
 from opendbc.car.tesla.preap.teslacan import TeslaCANPreAP
@@ -48,6 +49,14 @@ REGEN_COMMAND_CLEAR_DI = -1.0
 REGEN_DECEL_REQUEST_TRIGGER = -0.5  # m/s²; a meaningful deceleration request
 REGEN_DECEL_REQUEST_CLEAR = -0.2  # m/s²
 
+
+def overspeed_pullback(accel_request: float, v_ego: float, v_set: float, gain: float, regen_floor: float) -> float:
+  """Extra regen once vEgo is OVERSPEED_MARGIN over the set speed. Only ever lowers the request,
+  never below the profile's regen floor."""
+  overspeed = v_ego - (v_set + OVERSPEED_MARGIN)
+  if v_set <= 0.0 or gain <= 0.0 or overspeed <= 0.0:
+    return accel_request
+  return min(accel_request, max(regen_floor, -gain * overspeed))
 
 class RegenDecelMonitor:
   """Detect when the regen path cannot deliver the requested deceleration."""
@@ -302,6 +311,7 @@ class PreAPLongController:
           in_engage_grace = engage_elapsed_frames < ENGAGE_GRACE_FRAMES
           accel_request = float(actuators.accel)
           accel_effort_limits = None
+          regen_floor, overspeed_gain = get_regen_profile()
           pedal_ramp_rate_up = (
             ENGAGE_GRACE_PEDAL_RAMP_RATE_UP
             if self.preap_long_handoff_slew_active
@@ -316,13 +326,17 @@ class PreAPLongController:
             accel_request = max(0.0, min(accel_request, accel_cap))
             accel_effort_limits = (0.0, accel_cap)
             pedal_ramp_rate_up = ENGAGE_GRACE_PEDAL_RAMP_RATE_UP
+          else:
+            accel_request = overspeed_pullback(accel_request, CS.out.vEgo, CS.out.cruiseState.speed,
+                                               overspeed_gain, regen_floor)
 
           self.prev_pedal_di = self.vdas.update(
             accel_request, CS.out.vEgo, self.prev_pedal_di,
             a_ego=CS.out.aEgo, freeze_integrator=in_engage_grace,
             orientation_ned=list(CC.orientationNED),
             accel_effort_limits=accel_effort_limits,
-            pedal_ramp_rate_up=pedal_ramp_rate_up)
+            pedal_ramp_rate_up=pedal_ramp_rate_up,
+            regen_floor=regen_floor)
           handoff_slew_complete = (
             self.preap_long_handoff_slew_active
             and not in_engage_grace

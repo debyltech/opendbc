@@ -57,3 +57,18 @@ VDAS_ZERO_TORQUE_TRANSITION_WIDTH = 0.25  # m/s² on each side of zero
 # This limits one-frame sensor/source discontinuities without constraining the
 # tighter acceleration-command jerk limits above.
 VDAS_EGO_JERK_MAX = 5.0  # m/s³
+
+
+# Regen profiles, NAPRegenProfile: 0 relaxed, 1 standard (default), 2 aggressive.
+# full-lift regen: the decel (m/s²) a profile assumes a fully lifted pedal delivers. The feedforward
+#   table assumes REGEN_MAX (-1.5); NAP's captured plant gives about -1.05. A smaller magnitude lifts
+#   the pedal further for the same decel request and is also the envelope floor the "brake" prompt
+#   checks against, so a stronger profile brakes harder and warns earlier.
+# overspeed gain: extra decel (m/s² per m/s) once vEgo is OVERSPEED_MARGIN above the set speed.
+REGEN_PROFILES = {
+  0: (-1.5, 0.0),   # relaxed: NAP's behaviour unchanged
+  1: (-1.25, 0.3),  # standard
+  2: (-1.05, 0.6),  # aggressive: full lift at NAP's measured regen
+}
+REGEN_PROFILE_DEFAULT = 1
+OVERSPEED_MARGIN = 0.45  # m/s, 1 mph

@@ -55,7 +55,7 @@ def controller_env(monkeypatch):
     enableJustCC=False,
     engagement=engagement,
     real_brake_pressed=False,
-    out=SimpleNamespace(vEgo=15.0, aEgo=0.0, gasPressed=False),
+    out=SimpleNamespace(vEgo=15.0, aEgo=0.0, gasPressed=False, cruiseState=SimpleNamespace(speed=0.0)),
     pedal_interceptor_value=0.0,
     cruise_buttons=0,
     prev_cruise_buttons=0,
