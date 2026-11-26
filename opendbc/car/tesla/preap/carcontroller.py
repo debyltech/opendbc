@@ -46,11 +46,8 @@ REGEN_DECEL_SHORTFALL_TRIGGER = 0.35  # m/s²
 REGEN_DECEL_SHORTFALL_CLEAR = 0.15  # m/s²
 REGEN_COMMAND_TRIGGER_DI = -2.0  # command deep in the regen range
 REGEN_COMMAND_CLEAR_DI = -1.0
-REGEN_DECEL_REQUEST_TRIGGER = -0.5  # m/s²; a meaningful deceleration request
+REGEN_DECEL_REQUEST_TRIGGER = -1.0  # m/s²; only a real braking need, not settling to the set speed
 REGEN_DECEL_REQUEST_CLEAR = -0.2  # m/s²
-# With no lead, regen falling short just lets the car coast a little over the set speed (cold pack,
-# downhill), which is fine: only ask for the brake once it is this far over.
-REGEN_PROMPT_OVERSPEED_TOLERANCE = 2.24  # m/s, 5 mph
 
 
 def overspeed_pullback(accel_request: float, v_ego: float, v_set: float, gain: float, regen_floor: float) -> float:
@@ -73,16 +70,15 @@ class RegenDecelMonitor:
     self.evidence_updates = 0
 
   def update(self, *, pedal_control_active, in_engage_grace, pedal_di,
-             limited_accel, actual_accel, v_ego, lead_visible=True, v_cruise=0.0):
+             limited_accel, actual_accel, v_ego, lead_visible=True):
     values_are_finite = all(np.isfinite((pedal_di, limited_accel, actual_accel, v_ego)))
     decel_shortfall = actual_accel - limited_accel
-    shortfall_matters = lead_visible or v_cruise <= 0.0 or v_ego > v_cruise + REGEN_PROMPT_OVERSPEED_TOLERANCE
     monitoring_allowed = (
       pedal_control_active
       and not in_engage_grace
       and values_are_finite
       and limited_accel < 0.0
-      and shortfall_matters
+      and lead_visible  # with no lead, weak regen only means coasting over the set speed: never critical
     )
 
     if self.active:
@@ -362,7 +358,6 @@ class PreAPLongController:
             actual_accel=CS.out.aEgo,
             v_ego=CS.out.vEgo,
             lead_visible=CC.hudControl.leadVisible,
-            v_cruise=CS.out.cruiseState.speed,
           )
 
         except Exception:
