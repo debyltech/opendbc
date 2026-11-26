@@ -1,4 +1,4 @@
-using Cxx = import "./include/c++.capnp";
+using Cxx = import "/include/c++.capnp";
 $Cxx.namespace("cereal");
 
 @0x8e2af1e708af8b8d;
@@ -176,8 +176,6 @@ struct CarState {
 
   gasPressed @4 :Bool;    # this is user pedal only
 
-  # brake pedal, 0.0-1.0
-  brake @5 :Float32;      # this is user pedal only
   brakePressed @6 :Bool;  # this is user pedal only
   regenBraking @45 :Bool; # this is user pedal only
   parkingBrake @39 :Bool;
@@ -205,23 +203,24 @@ struct CarState {
   vehicleSensorsInvalid @52 :Bool;  # invalid steering angle readings, etc.
   lowSpeedAlert @56 :Bool;  # lost steering control due to a dynamic min steering speed
   blockPcmEnable @60 :Bool;  # whether to allow PCM to enable this frame
-  pedalMaxRegen @61 :Bool;  # regen near limit and sustained decel demand is not being delivered
-  pedalLongActive @62 :Bool;  # Pre-AP pedal firmware has accepted longitudinal authority
-  teslaCCEngaged @63 :Bool;     # NAP: rising edge of stock Tesla CC engaging (no-pedal mode)
-  teslaCCDisengaged @64 :Bool;  # NAP: falling edge of stock Tesla CC
-  teslaCCNotArmed @65 :Bool;    # NAP: lateral engaged but DI_cruiseState != STANDBY/ENABLED
-  turnSignalStalkState @66 :UInt8;  # NAP: physical turn-signal lever, 0=idle, 1=left, 2=right
-  pedalAuthorityRequested @67 :Bool;  # NAP: pedal command authority is currently requested
-  pedalAuthorityState @68 :UInt8;  # NAP: PedalAuthorityState numeric value
-  pedalAuthorityAction @69 :UInt8;  # NAP: most recent PedalCommandAction numeric value
-  pedalCommandCounter @70 :UInt8;  # NAP: counter from the most recently transmitted pedal command
-  pedalFeedbackState @71 :UInt8;  # NAP: Comma Pedal firmware state
-  pedalFeedbackCounter @72 :UInt8;  # NAP: Comma Pedal feedback counter
-  pedalFirstEnabledMonoTime @73 :UInt64;  # NAP: monotonic timestamp of first enabled command for this request
-  vdasLimitedAccel @74 :Float32;  # NAP: jerk-limited VDAS acceleration command
-  pedalCommandDi @75 :Float32;  # NAP: controller DI-domain command/seed; RESET wire frames carry zero
-  pedalAuthorityFailed @76 :Bool;  # NAP: bounded pedal authority acquisition failed
-  enableLongControl @77 :Bool;  # Pre-AP: FSM longitudinal intent; survives gas override
+  carNotReady @61 :Bool;  # car is transiently refusing engagement, used to prevent a fault if engaged
+  pedalMaxRegen @62 :Bool;  # regen near limit and sustained decel demand is not being delivered
+  pedalLongActive @63 :Bool;  # Pre-AP pedal firmware has accepted longitudinal authority
+  teslaCCEngaged @64 :Bool;     # NAP: rising edge of stock Tesla CC engaging (no-pedal mode)
+  teslaCCDisengaged @65 :Bool;  # NAP: falling edge of stock Tesla CC
+  teslaCCNotArmed @66 :Bool;    # NAP: lateral engaged but DI_cruiseState != STANDBY/ENABLED
+  turnSignalStalkState @67 :UInt8;  # NAP: physical turn-signal lever, 0=idle, 1=left, 2=right
+  pedalAuthorityRequested @68 :Bool;  # NAP: pedal command authority is currently requested
+  pedalAuthorityState @69 :UInt8;  # NAP: PedalAuthorityState numeric value
+  pedalAuthorityAction @70 :UInt8;  # NAP: most recent PedalCommandAction numeric value
+  pedalCommandCounter @71 :UInt8;  # NAP: counter from the most recently transmitted pedal command
+  pedalFeedbackState @72 :UInt8;  # NAP: Comma Pedal firmware state
+  pedalFeedbackCounter @73 :UInt8;  # NAP: Comma Pedal feedback counter
+  pedalFirstEnabledMonoTime @74 :UInt64;  # NAP: monotonic timestamp of first enabled command for this request
+  vdasLimitedAccel @75 :Float32;  # NAP: jerk-limited VDAS acceleration command
+  pedalCommandDi @76 :Float32;  # NAP: controller DI-domain command/seed; RESET wire frames carry zero
+  pedalAuthorityFailed @77 :Bool;  # NAP: bounded pedal authority acquisition failed
+  enableLongControl @78 :Bool;  # Pre-AP: FSM longitudinal intent; survives gas override
 
   # cruise state
   cruiseState @10 :CruiseState;
@@ -263,7 +262,9 @@ struct CarState {
     standstill @4 :Bool;
     nonAdaptive @5 :Bool;
 
-    speedOffsetDEPRECATED @3 :Float32;
+    deprecated :group {
+      speedOffset @3 :Float32;
+    }
   }
 
   enum GearShifter {
@@ -300,16 +301,18 @@ struct CarState {
     }
   }
 
-  # deprecated
-  errorsDEPRECATED @0 :List(OnroadEventDEPRECATED.EventName);
-  gasDEPRECATED @3 :Float32;        # this is user pedal only
-  brakeLightsDEPRECATED @19 :Bool;
-  steeringRateLimitedDEPRECATED @29 :Bool;
-  canMonoTimesDEPRECATED @12: List(UInt64);
-  canRcvTimeoutDEPRECATED @49 :Bool;
-  eventsDEPRECATED @13 :List(OnroadEventDEPRECATED);
-  clutchPressedDEPRECATED @28 :Bool;
-  engineRpmDEPRECATED @46 :Float32;
+  deprecated :group {
+    errors @0 :List(OnroadEventDEPRECATED.EventName);
+    gas @3 :Float32;
+    brake @5 :Float32;
+    brakeLights @19 :Bool;
+    steeringRateLimited @29 :Bool;
+    canMonoTimes @12: List(UInt64);
+    canRcvTimeout @49 :Bool;
+    events @13 :List(OnroadEventDEPRECATED);
+    clutchPressed @28 :Bool;
+    engineRpm @46 :Float32;
+  }
 }
 
 # ******* radar state @ 20hz *******
@@ -326,21 +329,18 @@ struct RadarData @0x888ad6581cf0aacb {
   }
 
   # similar to LiveTracks
-  # is one timestamp valid for all? I think so
   struct RadarPoint {
+    # all fields required
     trackId @0 :UInt64;  # no trackId reuse
+    dRel @1 :Float32;    # m from the front bumper of the car
+    yRel @2 :Float32;    # m
+    vRel @3 :Float32;    # m/s
 
-    # these 3 are the minimum required
-    dRel @1 :Float32; # m from the front bumper of the car
-    yRel @2 :Float32; # m
-    vRel @3 :Float32; # m/s
-
-    # these are optional and valid if they are not NaN
-    aRel @4 :Float32; # m/s^2
-    yvRel @5 :Float32; # m/s
-
-    # some radars flag measurements VS estimates
-    measured @6 :Bool;
+    deprecated :group {
+      aRel @4 :Float32; # m/s^2
+      yvRel @5 :Float32; # m/s
+      measured @6 :Bool;  # measurement VS estimate flag
+    }
   }
 
   enum ErrorDEPRECATED {
@@ -349,9 +349,10 @@ struct RadarData @0x888ad6581cf0aacb {
     wrongConfig @2;
   }
 
-  # deprecated
-  canMonoTimesDEPRECATED @2 :List(UInt64);
-  errorsDEPRECATED @0 :List(ErrorDEPRECATED);
+  deprecated :group {
+    canMonoTimes @2 :List(UInt64);
+    errors @0 :List(ErrorDEPRECATED);
+  }
 }
 
 # ******* car controls @ 100hz *******
@@ -372,6 +373,8 @@ struct CarControl {
   orientationNED @13 :List(Float32);
   angularVelocity @14 :List(Float32);
   currentCurvature @17 :Float32;  # From vehicle model
+
+  driverMonitoringEscalation @18 :Bool; # trigger the car's stock driver monitoring escalation
 
   cruiseControl @4 :CruiseControl;
   hudControl @5 :HUDControl;
@@ -404,8 +407,11 @@ struct CarControl {
     cancel @0: Bool;
     resume @1: Bool;
     override @4: Bool;
-    speedOverrideDEPRECATED @2: Float32;
-    accelOverrideDEPRECATED @3: Float32;
+
+    deprecated :group {
+      speedOverride @2: Float32;
+      accelOverride @3: Float32;
+    }
   }
 
   struct HUDControl {
@@ -452,13 +458,15 @@ struct CarControl {
     }
   }
 
-  gasDEPRECATED @1 :Float32;
-  brakeDEPRECATED @2 :Float32;
-  steeringTorqueDEPRECATED @3 :Float32;
-  activeDEPRECATED @7 :Bool;
-  rollDEPRECATED @8 :Float32;
-  pitchDEPRECATED @9 :Float32;
-  actuatorsOutputDEPRECATED @10 :Actuators;
+  deprecated :group {
+    gas @1 :Float32;
+    brake @2 :Float32;
+    steeringTorque @3 :Float32;
+    active @7 :Bool;
+    roll @8 :Float32;
+    pitch @9 :Float32;
+    actuatorsOutput @10 :Actuators;
+  }
 }
 
 struct CarOutput {
@@ -478,8 +486,6 @@ struct CarParams {
   notCar @66 :Bool;  # flag for non-car robotics platforms
 
   pcmCruise @3 :Bool;        # is openpilot's state tied to the PCM's cruise state?
-  enableDsu @5 :Bool;        # driving support unit
-  enableBsm @56 :Bool;       # blind spot monitoring
   flags @64 :UInt32;         # flags for car specific quirks
   alphaLongitudinalAvailable @71 :Bool;
 
@@ -494,38 +500,29 @@ struct CarParams {
   autoResumeSng @69 :Bool;               # describes whether car can resume from a stop automatically
 
   # things about the car in the manual
-  mass @17 :Float32;            # [kg] curb weight: all fluids no cargo
   wheelbase @18 :Float32;       # [m] distance from rear axle to front axle
   centerToFront @19 :Float32;   # [m] distance from center of mass to front axle
   steerRatio @20 :Float32;      # [] ratio of steering wheel angle to front wheel angle
-  steerRatioRear @21 :Float32;  # [] ratio of steering wheel angle to rear wheel angle (usually 0)
 
-  # things we can derive
-  rotationalInertia @22 :Float32;    # [kg*m2] body rotational inertia
+  # mass-normalized vehicle dynamics parameters
+  rotationalInertiaPerMass @22 :Float32;  # [m^2] rotational inertia per unit mass
   tireStiffnessFactor @72 :Float32;  # scaling factor used in calculating tireStiffness[Front,Rear]
-  tireStiffnessFront @23 :Float32;   # [N/rad] front tire coeff of stiff
-  tireStiffnessRear @24 :Float32;    # [N/rad] rear tire coeff of stiff
+  tireStiffnessFrontPerMass @23 :Float32;  # [N/(rad*kg)] front tire stiffness per unit mass
+  tireStiffnessRearPerMass @24 :Float32;   # [N/(rad*kg)] rear tire stiffness per unit mass
 
   longitudinalTuning @25 :LongitudinalPIDTuning;
-  lateralParams @48 :LateralParams;
   lateralTuning :union {
     pid @26 :LateralPIDTuning;
-    indiDEPRECATED @27 :LateralINDITuning;
-    lqrDEPRECATED @40 :LateralLQRTuning;
+    indiDEPRECATED @27 :LateralINDITuningDEPRECATED;
+    lqrDEPRECATED @40 :LateralLQRTuningDEPRECATED;
     torque @67 :LateralTorqueTuning;
   }
 
-  steerLimitAlert @28 :Bool;
   steerLimitTimer @47 :Float32;  # time before steerLimitAlert is issued
 
-  vEgoStopping @29 :Float32; # Speed at which the car goes into stopping state
-  vEgoStarting @59 :Float32; # Speed at which the car goes into starting state
   steerControlType @34 :SteerControlType;
   radarUnavailable @35 :Bool; # True when radar objects aren't visible on CAN or aren't parsed out
   stopAccel @60 :Float32; # Required acceleration to keep vehicle stationary
-  stoppingDecelRate @52 :Float32; # m/s^2/s while trying to stop
-  startAccel @32 :Float32; # Required acceleration to get car moving
-  startingState @70 :Bool; # Does this car make use of special starting state
 
   steerActuatorDelay @36 :Float32; # Steering wheel actuator delay in seconds
   longitudinalActuatorDelay @58 :Float32; # Gas/Brake actuator delay in seconds
@@ -548,8 +545,11 @@ struct CarParams {
   struct SafetyConfig {
     safetyModel @0 :SafetyModel;
     safetyParam @3 :UInt16;
-    safetyParamDEPRECATED @1 :Int16;
-    safetyParam2DEPRECATED @2 :UInt32;
+
+    deprecated :group {
+      safetyParam @1 :Int16;
+      safetyParam2 @2 :UInt32;
+    }
   }
 
   struct LateralParams {
@@ -570,24 +570,30 @@ struct CarParams {
     steeringAngleDeadzoneDeg @5 :Float32;
     latAccelFactor @6 :Float32;
     latAccelOffset @7 :Float32;
-    useSteeringAngleDEPRECATED @0 :Bool;
-    kpDEPRECATED @1 :Float32;
-    kiDEPRECATED @2 :Float32;
-    kfDEPRECATED @4 :Float32;
-    kdDEPRECATED @8 : Float32;
+
+    deprecated :group {
+      useSteeringAngle @0 :Bool;
+      kp @1 :Float32;
+      ki @2 :Float32;
+      kf @4 :Float32;
+      kd @8 : Float32;
+    }
   }
 
   struct LongitudinalPIDTuning {
-    kpBP @0 :List(Float32);
-    kpV @1 :List(Float32);
     kiBP @2 :List(Float32);
     kiV @3 :List(Float32);
-    kf @6 :Float32;
-    deadzoneBPDEPRECATED @4 :List(Float32);
-    deadzoneVDEPRECATED @5 :List(Float32);
+
+    deprecated :group {
+      kf @6 :Float32;
+      deadzoneBP @4 :List(Float32);
+      deadzoneV @5 :List(Float32);
+      kpBP @0 :List(Float32);
+      kpV @1 :List(Float32);
+    }
   }
 
-  struct LateralINDITuning {
+  struct LateralINDITuningDEPRECATED {
     outerLoopGainBP @4 :List(Float32);
     outerLoopGainV @5 :List(Float32);
     innerLoopGainBP @6 :List(Float32);
@@ -597,13 +603,15 @@ struct CarParams {
     actuatorEffectivenessBP @10 :List(Float32);
     actuatorEffectivenessV @11 :List(Float32);
 
-    outerLoopGainDEPRECATED @0 :Float32;
-    innerLoopGainDEPRECATED @1 :Float32;
-    timeConstantDEPRECATED @2 :Float32;
-    actuatorEffectivenessDEPRECATED @3 :Float32;
+    deprecated :group {
+      outerLoopGain @0 :Float32;
+      innerLoopGain @1 :Float32;
+      timeConstant @2 :Float32;
+      actuatorEffectiveness @3 :Float32;
+    }
   }
 
-  struct LateralLQRTuning {
+  struct LateralLQRTuningDEPRECATED {
     scale @0 :Float32;
     ki @1 :Float32;
     dcGain @2 :Float32;
@@ -653,16 +661,18 @@ struct CarParams {
     fcaGiorgio @32;
     rivian @33;
     volkswagenMeb @34;
-    mg @35;
-    teslaLegacy @36;
-    teslaPreap @37;
+    byd @35;
+    volvo @36;
+    bmw @37;
+    mg @38;
+    teslaLegacy @39;
+    teslaPreap @40;
   }
 
   enum SteerControlType {
     torque @0;
     angle @1;
-
-    curvatureDEPRECATED @2;
+    curvature @2;
   }
 
   enum TransmissionType {
@@ -730,27 +740,40 @@ struct CarParams {
     gateway @1;    # Integration at vehicle's CAN gateway
   }
 
-  enableGasInterceptorDEPRECATED @2 :Bool;
-  enableCameraDEPRECATED @4 :Bool;
-  enableApgsDEPRECATED @6 :Bool;
-  steerRateCostDEPRECATED @33 :Float32;
-  isPandaBlackDEPRECATED @39 :Bool;
-  hasStockCameraDEPRECATED @57 :Bool;
-  safetyParamDEPRECATED @10 :Int16;
-  safetyModelDEPRECATED @9 :SafetyModel;
-  safetyModelPassiveDEPRECATED @42 :SafetyModel = silent;
-  minSpeedCanDEPRECATED @51 :Float32;
-  communityFeatureDEPRECATED @46: Bool;
-  startingAccelRateDEPRECATED @53 :Float32;
-  steerMaxBPDEPRECATED @11 :List(Float32);
-  steerMaxVDEPRECATED @12 :List(Float32);
-  gasMaxBPDEPRECATED @13 :List(Float32);
-  gasMaxVDEPRECATED @14 :List(Float32);
-  brakeMaxBPDEPRECATED @15 :List(Float32);
-  brakeMaxVDEPRECATED @16 :List(Float32);
-  directAccelControlDEPRECATED @30 :Bool;
-  maxSteeringAngleDegDEPRECATED @54 :Float32;
-  longitudinalActuatorDelayLowerBoundDEPRECATED @61 :Float32;
-  stoppingControlDEPRECATED @31 :Bool; # Does the car allow full control even at lows speeds when stopping
-  radarTimeStepDEPRECATED @45: Float32 = 0.05;  # time delta between radar updates, 20Hz is very standard
+  deprecated :group {
+    mass @17 :Float32;
+    steerRatioRear @21 :Float32;
+    lateralParams @48 :LateralParams;
+    enableGasInterceptor @2 :Bool;
+    enableCamera @4 :Bool;
+    enableApgs @6 :Bool;
+    steerLimitAlert @28 :Bool;
+    steerRateCost @33 :Float32;
+    isPandaBlack @39 :Bool;
+    hasStockCamera @57 :Bool;
+    safetyParam @10 :Int16;
+    safetyModel @9 :SafetyModel;
+    safetyModelPassive @42 :SafetyModel = silent;
+    minSpeedCan @51 :Float32;
+    communityFeature @46: Bool;
+    startingAccelRate @53 :Float32;
+    steerMaxBP @11 :List(Float32);
+    steerMaxV @12 :List(Float32);
+    gasMaxBP @13 :List(Float32);
+    gasMaxV @14 :List(Float32);
+    brakeMaxBP @15 :List(Float32);
+    brakeMaxV @16 :List(Float32);
+    directAccelControl @30 :Bool;
+    maxSteeringAngleDeg @54 :Float32;
+    longitudinalActuatorDelayLowerBound @61 :Float32;
+    stoppingControl @31 :Bool; # Does the car allow full control even at lows speeds when stopping
+    radarTimeStep @45: Float32 = 0.05;  # time delta between radar updates, 20Hz is very standard
+    enableDsu @5 :Bool;        # driving support unit
+    enableBsm @56 :Bool;       # blind spot monitoring
+    vEgoStarting @59 :Float32; # Speed at which the car goes into starting state
+    startAccel @32 :Float32; # Required acceleration to get car moving
+    startingState @70 :Bool; # Does this car make use of special starting state
+    vEgoStopping @29 :Float32; # Speed at which the car goes into stopping state
+    stoppingDecelRate @52 :Float32; # m/s^2/s while trying to stop
+  }
 }

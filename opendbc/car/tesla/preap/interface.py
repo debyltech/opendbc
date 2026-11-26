@@ -9,7 +9,7 @@ PREAP_FLAG_ENABLE_PEDAL = 1
 PREAP_FLAG_RADAR_EMULATION = 2
 from opendbc.car.tesla.preap.constants import (
   ACCEL_PREAP_BP, ACCEL_PREAP_PROFILES,
-  PEDAL_LONG_K_BP, PEDAL_LONG_KP_V, PEDAL_LONG_KI_V,
+  PEDAL_LONG_K_BP, PEDAL_LONG_KI_V,
 )
 
 try:
@@ -56,15 +56,9 @@ def get_preap_params(ret, fingerprint):
   ret.pcmCruise = not use_pedal
 
   if use_pedal:
-    ret.longitudinalTuning.kpBP = PEDAL_LONG_K_BP
-    ret.longitudinalTuning.kpV = PEDAL_LONG_KP_V
     ret.longitudinalTuning.kiBP = PEDAL_LONG_K_BP
     ret.longitudinalTuning.kiV = PEDAL_LONG_KI_V
-    # kf=1.0 feedforward: a_target passes through 1:1 to pedal mapping
-    try:
-      ret.longitudinalTuning.kf = 1.0
-    except AttributeError:
-      pass  # kf not available in all capnp schema versions
+    # openpilot >= 0.11.2: the PID has kp fixed at 0 and passes a_target through as feedforward
     ret.longitudinalActuatorDelay = 0.4
 
   # Legacy Model S steering and physical params
@@ -72,9 +66,6 @@ def get_preap_params(ret, fingerprint):
   ret.steerActuatorDelay = 0.1
   ret.steerAtStandstill = True
   ret.alphaLongitudinalAvailable = False
-  ret.vEgoStopping = 0.1
-  ret.vEgoStarting = 0.1
-  ret.stoppingDecelRate = 1.0
 
   # Pre-AP Model S is physically the same platform as HW1/HW2/HW3 Model S.
   # Vehicle params (mass=2100, wheelbase=2.960, steerRatio=15.0, and

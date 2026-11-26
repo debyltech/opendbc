@@ -97,20 +97,19 @@ class TestBoschSlotLifecycle:
 
     assert len(coasted.points) == 1
     assert coasted.points[0].trackId == first.points[0].trackId
-    assert coasted.points[0].measured is False
+    assert radar.bosch_tracks._slots[0].measured is False
 
   def test_two_invalid_frames_coast_then_third_expires(self):
     radar = _make_bosch_interface()
     _run_cycle(radar)
 
     first_coast = _run_cycle(radar, tracked=False)
-    second_coast = _run_cycle(radar, tracked=False)
-    expired = _run_cycle(radar, tracked=False)
-
     assert len(first_coast.points) == 1
-    assert first_coast.points[0].measured is False
+    assert radar.bosch_tracks._slots[0].measured is False
+    second_coast = _run_cycle(radar, tracked=False)
     assert len(second_coast.points) == 1
-    assert second_coast.points[0].measured is False
+    assert radar.bosch_tracks._slots[0].measured is False
+    expired = _run_cycle(radar, tracked=False)
     assert len(expired.points) == 0
 
   def test_plausible_return_preserves_identity(self):
@@ -122,7 +121,7 @@ class TestBoschSlotLifecycle:
 
     assert len(returned.points) == 1
     assert returned.points[0].trackId == first.points[0].trackId
-    assert returned.points[0].measured is True
+    assert radar.bosch_tracks._slots[0].measured is True
 
   @pytest.mark.parametrize(
     ("d_rel", "v_rel"),

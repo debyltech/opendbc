@@ -38,7 +38,6 @@ def update_preap(cs, can_parsers):
   ret.gasPressed = cp_pt.vl["DI_torque1"]["DI_pedalPos"] > PEDAL_DI_PRESSED
 
   # Brake pedal
-  ret.brake = 0
   di_brake_pressed = cp_chassis.vl["DI_torque2"]["DI_brakePedal"] == 1
   brake_message_pressed = cp_chassis.vl["BrakeMessage"]["driverBrakeStatus"] == 2
   cs.real_brake_pressed = di_brake_pressed or brake_message_pressed

@@ -51,7 +51,7 @@ def _get_preap_vm():
   return VehicleModel(CarInterface.get_non_essential_params("TESLA_MODEL_S_HW3"))
 
 
-class TeslaPreAPTestMixin(common.CarSafetyTest, common.AngleSteeringSafetyTest):
+class TeslaPreAPTestBase(common.CarSafetyTest, common.AngleSteeringSafetyTest):
   # Abstract base class — concrete subclasses (SteeringOnly, WithPedal) do the work.
   # __test__ = False prevents pytest from collecting this class directly (it still
   # gets collected via MRO without this, because CarSafetyTest is a TestCase).
@@ -416,7 +416,7 @@ class TeslaPreAPTestMixin(common.CarSafetyTest, common.AngleSteeringSafetyTest):
     raise NotImplementedError
 
 
-class TestTeslaPreAPSteeringOnly(TeslaPreAPTestMixin, unittest.TestCase):
+class TestTeslaPreAPSteeringOnly(TeslaPreAPTestBase, unittest.TestCase):
   """Pre-AP with no pedal — lateral only."""
   __test__ = True  # re-enable collection (mixin sets __test__=False)
 
@@ -446,12 +446,12 @@ class TestTeslaPreAPSteeringOnly(TeslaPreAPTestMixin, unittest.TestCase):
     # Tick 500ms after msgs — under the 1s min lag window for real checks but long
     # enough that a freq=0 divide-by-zero would have already tripped the pedal row.
     self.safety.set_timer(int(5e5))
-    self.safety.safety_tick_current_safety_config()
+    self.safety.safety_tick()
     self.assertTrue(self.safety.safety_config_valid(),
                     "rx_checks must stay valid without a pedal installed")
 
 
-class TestTeslaPreAPWithPedal(TeslaPreAPTestMixin, unittest.TestCase):
+class TestTeslaPreAPWithPedal(TeslaPreAPTestBase, unittest.TestCase):
   """Pre-AP with Comma Pedal enabled."""
   __test__ = True  # re-enable collection (mixin sets __test__=False)
 
@@ -851,7 +851,7 @@ class TestTeslaPreAPPedalCalibration(unittest.TestCase):
     self._rx(self.packer.make_can_msg_safety("GTW_carState", 0, {"DOOR_STATE_FL": 0}))
     self._rx(self.packer.make_can_msg_safety("STW_ACTN_RQ", 0, {"SpdCtrlLvr_Stat": 0}))
     self.safety.set_timer(int(5e5))
-    self.safety.safety_tick_current_safety_config()
+    self.safety.safety_tick()
     self.assertTrue(self.safety.safety_config_valid())
 
 

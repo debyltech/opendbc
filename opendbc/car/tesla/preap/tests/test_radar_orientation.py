@@ -90,8 +90,6 @@ def _point(ret):
 def _assert_longitudinal_unchanged(pt):
   assert pt.dRel == pytest.approx(LONG_DIST)
   assert pt.vRel == pytest.approx(LONG_SPEED)
-  assert pt.aRel == pytest.approx(LONG_ACCEL)
-  assert pt.measured is True
 
 
 def test_param_key_and_defaults():
@@ -118,7 +116,6 @@ def test_preap_upside_down_flips_laterals_then_adds_offset():
   pt = _point(ri.update(_pack_track(CAR.TESLA_MODEL_S_PREAP)))
   _assert_longitudinal_unchanged(pt)
   assert pt.yRel == pytest.approx(-LAT_DIST + OFFSET)
-  assert pt.yvRel == pytest.approx(-LAT_SPEED)
 
 
 def test_preap_upside_down_off_keeps_current_offset_behavior():
@@ -126,7 +123,6 @@ def test_preap_upside_down_off_keeps_current_offset_behavior():
   pt = _point(ri.update(_pack_track(CAR.TESLA_MODEL_S_PREAP)))
   _assert_longitudinal_unchanged(pt)
   assert pt.yRel == pytest.approx(LAT_DIST + OFFSET)
-  assert pt.yvRel == pytest.approx(LAT_SPEED)
 
 
 @pytest.mark.parametrize("fingerprint", OTHER_TESLAS)
@@ -135,7 +131,6 @@ def test_other_teslas_ignore_upside_down_even_when_forced_on(fingerprint):
   pt = _point(ri.update(_pack_track(fingerprint)))
   _assert_longitudinal_unchanged(pt)
   assert pt.yRel == pytest.approx(LAT_DIST)
-  assert pt.yvRel == pytest.approx(LAT_SPEED)
 
 
 def test_disabled_radar_emits_no_tracks_when_upside_down_forced():
@@ -158,7 +153,6 @@ def test_orientation_is_snapshotted_at_construction():
   conf.radar_offset = 99.0
   pt = _point(ri.update(_pack_track(CAR.TESLA_MODEL_S_PREAP)))
   assert pt.yRel == pytest.approx(-LAT_DIST + OFFSET)
-  assert pt.yvRel == pytest.approx(-LAT_SPEED)
 
 
 def test_missing_nap_conf_retains_direction_one():
@@ -169,4 +163,3 @@ def test_missing_nap_conf_retains_direction_one():
   pt = _point(ri.update(_pack_track(CAR.TESLA_MODEL_S_PREAP)))
   _assert_longitudinal_unchanged(pt)
   assert pt.yRel == pytest.approx(LAT_DIST)
-  assert pt.yvRel == pytest.approx(LAT_SPEED)

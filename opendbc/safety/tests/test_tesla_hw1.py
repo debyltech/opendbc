@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import random
 import unittest
 import numpy as np
 
@@ -10,7 +9,7 @@ from opendbc.car.vehicle_model import VehicleModel
 from opendbc.can import CANDefine
 from opendbc.safety.tests.libsafety import libsafety_py
 import opendbc.safety.tests.common as common
-from opendbc.safety.tests.common import CANPackerSafety, MAX_SPEED_DELTA, MAX_WRONG_COUNTERS, away_round, round_speed
+from opendbc.safety.tests.common import CANPackerSafety, away_round, round_speed
 
 MSG_DAS_steeringControl = 0x488
 MSG_DAS_Control_HW1 = 0x2b9

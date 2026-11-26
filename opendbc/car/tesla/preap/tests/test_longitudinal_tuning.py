@@ -17,6 +17,4 @@ def test_pedal_params_leave_generic_outer_feedback_disabled(monkeypatch):
 
   configured_params = interface.get_preap_params(params, fingerprint={})
 
-  assert list(configured_params.longitudinalTuning.kpV) == [0.0] * 4
   assert list(configured_params.longitudinalTuning.kiV) == [0.0] * 4
-  assert configured_params.longitudinalTuning.kf == 1.0
