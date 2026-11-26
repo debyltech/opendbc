@@ -428,6 +428,12 @@ class TestTeslaPreAPSteeringOnly(TeslaPreAPTestBase, unittest.TestCase):
     self.safety.set_safety_hooks(CarParams.SafetyModel.teslaPreap, 0)
     self.safety.init_tests()
 
+  def test_stalk_lever_tx_whitelist(self):
+    # IDLE, FWD (cancel), RWD (engage), UP_1ST (set), DN_1ST (decel set); everything else blocked
+    for lever in range(64):
+      msg = self.packer.make_can_msg_safety("STW_ACTN_RQ", 0, {"SpdCtrlLvr_Stat": lever})
+      self.assertEqual(lever in (0, 1, 2, 16, 32), self._tx(msg), f"lever={lever}")
+
   def test_pedal_blocked_without_flag(self):
     self.safety.set_controls_allowed(True)
     msg = self.packer.make_can_msg_safety("GAS_COMMAND", 0, {"GAS_COMMAND": 0, "ENABLE": 1})

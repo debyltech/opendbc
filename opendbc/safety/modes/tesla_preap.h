@@ -848,6 +848,17 @@ static bool tesla_preap_tx_hook(const CANPacket_t *msg) {
     }
   }
 
+  // STW_ACTN_RQ (0x45): stalk-button spoof. The stock-CC spoofer only sends IDLE, CANCEL (FWD),
+  // MAIN (RWD), SET_ACCEL (UP_1ST) and DECEL_SET (DN_1ST). Undefined values and the second-detent
+  // jumps (UP_2ND 4, DN_2ND 8) have no legitimate sender. Ported from Brennan Coslett's da3f4d3f.
+  if (msg->addr == 0x45U) {
+    int lever = msg->data[0] & 0x3FU;  // SpdCtrlLvr_Stat
+    bool allowed_lever = (lever == 0) || (lever == 1) || (lever == 2) || (lever == 16) || (lever == 32);
+    if (!allowed_lever) {
+      violation = true;
+    }
+  }
+
   if (violation) {
     tx = false;
   }
