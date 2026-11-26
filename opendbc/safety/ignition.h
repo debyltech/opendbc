@@ -46,6 +46,19 @@ void ignition_can_hook(const CANPacket_t *msg) {
     prev_counter_tesla = counter;
   }
 
+  // Tesla Model S legacy / pre-AP exception (NAP, from NotAutopilot/panda): these cars have no
+  // ignition line, so GTW_status car-on (bit 0) is the ignition. Counter-gated like the Model 3/Y one.
+  if (msg_matches(msg, 0x348U, 0U, 8U) || msg_matches(msg, 0x348U, 1U, 8U)) {
+    int counter = msg->data[6] & 0xFU;
+
+    static int prev_counter_tesla_legacy = -1;
+    if ((counter == ((prev_counter_tesla_legacy + 1) % 16)) && (prev_counter_tesla_legacy != -1)) {
+      ignition_can = (msg->data[0] & 0x1U) != 0U;
+      ignition_can_cnt = 0U;
+    }
+    prev_counter_tesla_legacy = counter;
+  }
+
   // Mazda exception
   if (msg_matches(msg, 0x9EU, 0U, 8U)) {
     ignition_can = (msg->data[0] >> 5) == 0x6U;

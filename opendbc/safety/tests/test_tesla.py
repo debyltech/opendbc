@@ -466,3 +466,45 @@ class TestTeslaIgnition(common.SafetyTestBase):
 
 if __name__ == "__main__":
   unittest.main()
+
+
+class TestTeslaLegacyIgnition(common.SafetyTestBase):
+  """Pre-AP / legacy Model S: GTW_status (0x348) car-on bit, counter in byte 6 low nibble."""
+  SAFETY_MODEL = None
+  TX_MSGS: list = []
+
+  def setUp(self):
+    from opendbc.safety.tests.libsafety import libsafety_py
+    self.safety = libsafety_py.libsafety
+    self.safety.init_tests()
+
+  @staticmethod
+  def _msg(counter, car_on, bus=0):
+    from opendbc.safety.tests.libsafety import libsafety_py
+    dat = bytearray(8)
+    dat[0] = 0x1 if car_on else 0x0
+    dat[6] = counter & 0xF
+    return libsafety_py.make_CANPacket(0x348, bus, dat)
+
+  def test_ignition_on_needs_consecutive_counters(self):
+    for bus in (0, 1):
+      for i in range(16):
+        self.safety.init_tests()
+        self.safety.ignition_can_hook(self._msg(i, True, bus))
+        self.assertFalse(self.safety.get_ignition_can())
+        self.safety.ignition_can_hook(self._msg((i + 1) % 16, True, bus))
+        self.assertTrue(self.safety.get_ignition_can())
+
+  def test_ignition_off(self):
+    self.safety.ignition_can_hook(self._msg(0, True))
+    self.safety.ignition_can_hook(self._msg(1, True))
+    self.assertTrue(self.safety.get_ignition_can())
+    self.safety.ignition_can_hook(self._msg(2, False))
+    self.assertFalse(self.safety.get_ignition_can())
+
+  def test_ignored_on_other_buses_and_lengths(self):
+    from opendbc.safety.tests.libsafety import libsafety_py
+    for i in range(3):
+      self.safety.ignition_can_hook(self._msg(i, True, bus=2))
+      self.safety.ignition_can_hook(libsafety_py.make_CANPacket(0x348, 0, bytes([1, 0, 0, 0, 0, 0, i])))
+    self.assertFalse(self.safety.get_ignition_can())
