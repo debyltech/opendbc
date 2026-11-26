@@ -1456,6 +1456,7 @@ class TestVDASDomainBoundaries:
     measured_acceleration = 0.7
     cc = SimpleNamespace(
       actuators=SimpleNamespace(accel=0.0),
+      hudControl=SimpleNamespace(leadVisible=True),
       longActive=False,
       orientationNED=[],
     )

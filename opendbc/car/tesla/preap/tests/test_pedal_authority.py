@@ -66,6 +66,7 @@ def controller_env(monkeypatch):
   )
   cc = SimpleNamespace(
     actuators=SimpleNamespace(accel=0.0),
+    hudControl=SimpleNamespace(leadVisible=True),
     longActive=False,
     orientationNED=[],
   )
@@ -914,3 +915,24 @@ def test_regen_prompt_stays_silent_on_captured_grade_decel():
   # grade compensation with the pedal still in the propulsion range.
   samples = _replay_fixture('grade_decel_positive_di_50hz.json')
   assert _replay_monitor(samples) is None
+
+
+def test_regen_prompt_stays_silent_coasting_just_over_set_speed_without_lead():
+  # Cold pack downhill: set 32 mph, coasting at 34 mph with regen maxed is acceptable.
+  monitor = RegenDecelMonitor()
+  v_set = 32 * 0.44704
+  for _ in range(3 * REGEN_DECEL_PROMPT_DWELL_UPDATES):
+    assert not monitor.update(pedal_control_active=True, in_engage_grace=False, pedal_di=-5.0,
+                              limited_accel=-1.5, actual_accel=-0.5, v_ego=34 * 0.44704,
+                              lead_visible=False, v_cruise=v_set)
+
+
+def test_regen_prompt_still_fires_with_lead_or_far_over_set_speed():
+  for lead_visible, v_ego_mph in ((True, 34), (False, 38)):
+    monitor = RegenDecelMonitor()
+    fired = False
+    for _ in range(REGEN_DECEL_PROMPT_DWELL_UPDATES):
+      fired = monitor.update(pedal_control_active=True, in_engage_grace=False, pedal_di=-5.0,
+                             limited_accel=-1.5, actual_accel=-0.5, v_ego=v_ego_mph * 0.44704,
+                             lead_visible=lead_visible, v_cruise=32 * 0.44704)
+    assert fired
