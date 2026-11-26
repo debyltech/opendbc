@@ -46,7 +46,6 @@ class CarState(CarStateBase):
     self.msg_stw_actn_req = None  # Full STW_ACTN_RQ message for spoofing cancel commands
 
     # Follow distance stalk tracking
-    self.prev_stalk_follow = 0
     self.speed_units = "MPH"  # Updated from DI_state each frame
 
     # Pre-AP state (only instantiated for Pre-AP cars)
