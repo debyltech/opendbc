@@ -54,12 +54,12 @@ NEGATIVE_HANDOFF_INTEGRAL_SLEW = 0.25  # m/s³
 NEGATIVE_HANDOFF_PEDAL_STEP = 0.50  # DI/update
 
 GRAVITY = 9.81  # m/s²
-PITCH_LP_RC = 0.5   # low-pass filter RC for steady-state grade (seconds)
+PITCH_LP_RC = 0.75  # low-pass filter RC for steady-state grade (seconds); the pitch arrives 0.8 s ahead (controlsd)
 PITCH_HP_RC1 = 0.1  # high-pass inner RC for transient grade detection
 PITCH_HP_RC2 = 1.0  # high-pass outer RC
 MAX_PITCH_COMPENSATION = 1.5  # m/s² — clamp transient compensation
 MAX_STEADY_GRADE_COMPENSATION = 1.5  # m/s² — reject implausible sustained pitch
-TRANSIENT_GRADE_GAIN = 0.4
+TRANSIENT_GRADE_GAIN = 0.0  # off: the model lookahead pitch replaces this bump (rougher with it on hill logs)
 ORIENTATION_DROPOUT_HOLD_S = 0.50
 ORIENTATION_DROPOUT_DECAY_S = 1.50
 

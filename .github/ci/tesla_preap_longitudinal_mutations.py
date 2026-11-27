@@ -315,11 +315,11 @@ MUTATIONS = (
   HistoricalMutation(
     name="full-strength-transient-grade-overshoot",
     source_path="opendbc/car/tesla/preap/virtual_das.py",
-    original=b"TRANSIENT_GRADE_GAIN = 0.4\n",
+    original=b"TRANSIENT_GRADE_GAIN = 0.0  # off: the model lookahead pitch replaces this bump (rougher with it on hill logs)\n",
     replacement=b"TRANSIENT_GRADE_GAIN = 1.0\n",
     test_node=(
-      "opendbc/car/tesla/preap/tests/test_vdas_grade_control.py::" +
-      "test_flat_to_grade_step_improves_on_no_pitch_baseline_at_1p5_seconds[0.4]"
+      "opendbc/car/tesla/preap/tests/test_virtual_das.py::" +
+      "TestGradeEstimator::test_pitch_step_adds_no_transient_bump"
     ),
   ),
   HistoricalMutation(

@@ -836,7 +836,9 @@ def test_steady_grade_hold_does_not_double_compensate(
 
 def run_grade_step(*, speed_mps: float, uphill_load_mps2: float,
                    duration_s: float, plant: DelayedPedalPlantCase,
-                   monkeypatch) -> list[PedalPlantSample]:
+                   monkeypatch, pitch_lead_s: float = 0.0) -> list[PedalPlantSample]:
+  # pitch_lead_s: the sensed pitch steps this long before the load arrives (controlsd feeds pre-AP
+  # the model's pitch 0.8 s ahead); samples count from the load step
   monkeypatch.setattr(
     virtual_das,
     "nap_conf",
@@ -875,8 +877,9 @@ def run_grade_step(*, speed_mps: float, uphill_load_mps2: float,
   current_speed_mps = speed_mps
   speed_delta_mps = 0.0
   samples = []
+  lead_steps = round(pitch_lead_s / CONTROL_DT_S)
 
-  for step in range(round(duration_s / CONTROL_DT_S)):
+  for step in range(-lead_steps, round(duration_s / CONTROL_DT_S)):
     pedal_di = controller.update(
       0.0,
       v_ego=max(current_speed_mps, 0.0),
@@ -889,13 +892,15 @@ def run_grade_step(*, speed_mps: float, uphill_load_mps2: float,
     delayed_pedals_di.append(pedal_di)
     plant_target_acceleration_mps2 = (
       (applied_pedal_di - COAST_PEDAL_DI) * plant.acceleration_per_di_mps2
-      - uphill_load_mps2
+      - (uphill_load_mps2 if step >= 0 else 0.0)
     )
     net_acceleration_mps2 += plant_alpha * (
       plant_target_acceleration_mps2 - net_acceleration_mps2
     )
     speed_delta_mps += net_acceleration_mps2 * CONTROL_DT_S
     current_speed_mps = speed_mps + speed_delta_mps
+    if step < 0:
+      continue
     samples.append(PedalPlantSample(
       elapsed_s=(step + 1) * CONTROL_DT_S,
       net_acceleration_mps2=net_acceleration_mps2,
@@ -915,6 +920,7 @@ def test_flat_to_grade_step_improves_on_no_pitch_baseline_at_1p5_seconds(
     duration_s=SHORT_HORIZON_S,
     plant=NOMINAL_PLANT,
     monkeypatch=monkeypatch,
+    pitch_lead_s=0.8,
   )
   no_pitch_samples = run_grade_step(
     speed_mps=15.0,

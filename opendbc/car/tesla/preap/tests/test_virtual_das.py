@@ -1082,16 +1082,27 @@ class TestGradeEstimator:
     _, pitch_comp = ge.update([0.0, math.radians(20.0), 0.0])
     assert abs(pitch_comp) <= MAX_PITCH_COMPENSATION + 0.01
 
+  def test_pitch_step_adds_no_transient_bump(self):
+    # controlsd feeds pre-AP the model's pitch 0.8 s ahead, which does the bump's job; with both, hill logs
+    # replay rougher
+    import math
+    from opendbc.car.tesla.preap.virtual_das import GradeEstimator
+    ge = GradeEstimator(dt=0.02)
+    ge.update([0.0, 0.0, 0.0])
+    for _ in range(25):
+      _, pitch_comp = ge.update([0.0, math.radians(4.0), 0.0])
+      assert pitch_comp == 0.0
+
   def test_sustained_pitch_outlier_cannot_exceed_steady_grade_limit(self):
     import math
-    from opendbc.car.tesla.preap.virtual_das import GradeEstimator, MAX_STEADY_GRADE_COMPENSATION
+    from opendbc.car.tesla.preap.virtual_das import GradeEstimator, MAX_STEADY_GRADE_COMPENSATION, PITCH_LP_RC
     ge = GradeEstimator(dt=0.02)
 
     for _ in range(500):
       grade, _ = ge.update([0.0, math.radians(20.0), 0.0])
 
     assert abs(grade) <= MAX_STEADY_GRADE_COMPENSATION
-    for _ in range(50):
+    for _ in range(round(2 * PITCH_LP_RC / 0.02)):
       recovered_grade, _ = ge.update([0.0, 0.0, 0.0])
     assert abs(recovered_grade) < 0.3
 
@@ -1136,7 +1147,7 @@ class TestGradeEstimator:
 
   def test_crest_reacquisition_after_long_dropout_uses_new_grade_sign(self):
     import math
-    from opendbc.car.tesla.preap.virtual_das import GradeEstimator
+    from opendbc.car.tesla.preap.virtual_das import GradeEstimator, PITCH_LP_RC
     dt = 0.02
     ge = GradeEstimator(dt=dt)
 
@@ -1151,7 +1162,7 @@ class TestGradeEstimator:
     first_reacquired_compensation = grade + transient
     assert -0.25 <= first_reacquired_compensation < 0.0
 
-    for _ in range(round(1.50 / dt) - 1):
+    for _ in range(round(3 * PITCH_LP_RC / dt) - 1):
       grade, transient = ge.update([0.0, math.radians(-3.0), 0.0])
 
     assert grade == pytest.approx(math.sin(math.radians(-3.0)) * 9.81, abs=0.05)
