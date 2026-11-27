@@ -38,6 +38,9 @@ class NAPParamKeys:
 
   # iBooster / Braking
   IBOOSTER_ENABLED = "NAPiBoosterEnabled"
+
+  # Steering
+  COOP_STEERING = "NAPCoopSteering"
   BRAKE_FACTOR = "NAPBrakeFactor"
 
   # Advanced

@@ -8,6 +8,7 @@ from opendbc.car.tesla.teslacan_legacy import TeslaCANRaven
 from opendbc.car.tesla.values import CarControllerParams, CANBUS, LEGACY_CARS, CAR
 from opendbc.car.vehicle_model import VehicleModel
 from opendbc.car.tesla.preap.carcontroller import PreAPLongController, init_preap_can
+from opendbc.car.tesla.preap.coop_steering import CoopSteering
 from opendbc.car.tesla.preap.nap_conf import nap_conf
 from opendbc.car.tesla.preap.stock_cc_spoofer import StockCCSpoofer
 
@@ -37,6 +38,7 @@ class CarController(CarControllerBase):
 
       if CP.carFingerprint == CAR.TESLA_MODEL_S_PREAP:
         self.preap_long = PreAPLongController()
+        self.coop = CoopSteering()
         self.stock_cc = StockCCSpoofer()
         self.tesla_can = init_preap_can(dbc_names, self.packers)
         self.radar_vin_idx = 0
@@ -98,7 +100,10 @@ class CarController(CarControllerBase):
     lat_active = CC.latActive and CS.hands_on_level < 3
 
     if self.frame % 2 == 0:
-      self.apply_angle_last = apply_steer_angle_limits_vm(actuators.steeringAngleDeg, self.apply_angle_last, CS.out.vEgoRaw, CS.out.steeringAngleDeg,
+      # toggle read only while steering is inactive: the controller latches it at engage
+      target = self.coop.update(actuators.steeringAngleDeg, CS.out.steeringAngleDeg, CS.out.steeringTorque, CS.out.vEgoRaw,
+                                lat_active, not lat_active and nap_conf.coop_steering)
+      self.apply_angle_last = apply_steer_angle_limits_vm(target, self.apply_angle_last, CS.out.vEgoRaw, CS.out.steeringAngleDeg,
                                                           lat_active, CarControllerParams, self.VM)
       cntr = (self.frame // 2) % 16
       can_sends.append(self.tesla_can.create_steering_control(cntr, self.apply_angle_last, lat_active))
