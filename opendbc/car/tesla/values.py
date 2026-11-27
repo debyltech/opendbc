@@ -120,7 +120,7 @@ class CAR(Platforms):
   TESLA_MODEL_S_PREAP = TeslaPlatformConfig(
     [CarDocs("Tesla Model S (Pre-AP) 2012-14", "All", car_parts=CarParts.common([CarHarness.tesla_model_s_hw1]))],
     # Dual-motor Model S arrived with AP1 hardware, so Pre-AP cars are RWD.
-    CarSpecs(wheelbase=2.960, steerRatio=15.0, centerToFrontRatio=MODEL_S_CENTER_TO_FRONT_RWD),
+    CarSpecs(wheelbase=2.960, steerRatio=13.9, centerToFrontRatio=MODEL_S_CENTER_TO_FRONT_RWD),  # paramsd-learned, 2026-11-26
     {
       Bus.chassis: 'tesla_preap',
       Bus.party: 'tesla_preap',

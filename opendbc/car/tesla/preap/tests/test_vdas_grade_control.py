@@ -8,7 +8,7 @@ import pytest
 from numpy import interp
 
 from opendbc.car.tesla.preap import virtual_das
-from opendbc.car.tesla.preap.constants import VDAS_ACCEL_JERK_MAX, VDAS_DECEL_JERK_MAX
+from opendbc.car.tesla.preap.constants import VDAS_DECEL_JERK_MAX
 from opendbc.car.tesla.preap.virtual_das import FeedforwardModel, GRAVITY, VirtualDAS
 
 
@@ -547,9 +547,10 @@ def test_handoff_shares_command_jerk_budget_in_both_directions(monkeypatch):
     -VDAS_DECEL_JERK_MAX,
     abs_tol=1e-12,
   )
-  assert maximum_recovery_jerk_mps3 <= VDAS_ACCEL_JERK_MAX or math.isclose(
+  # the recovery stays negative, so it releases at the braking jerk
+  assert maximum_recovery_jerk_mps3 <= VDAS_DECEL_JERK_MAX or math.isclose(
     maximum_recovery_jerk_mps3,
-    VDAS_ACCEL_JERK_MAX,
+    VDAS_DECEL_JERK_MAX,
     abs_tol=1e-12,
   )
 

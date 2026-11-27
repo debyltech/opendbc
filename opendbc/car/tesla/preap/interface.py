@@ -75,7 +75,7 @@ def get_preap_params(ret, fingerprint):
 
   # Legacy Model S steering and physical params
   ret.steerLimitTimer = 0.4
-  ret.steerActuatorDelay = 0.1
+  ret.steerActuatorDelay = 0.25  # EPAS lags the angle command 0.30-0.40 s (2026-11-26 drive); lagd starts at +0.2
   ret.steerAtStandstill = True
   ret.alphaLongitudinalAvailable = False
 

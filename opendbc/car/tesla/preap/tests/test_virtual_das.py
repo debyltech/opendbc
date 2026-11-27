@@ -12,7 +12,7 @@ from opendbc.car.tesla.preap.ff_table_default import (
   DEFAULT_TABLE as FF_DEFAULT_TABLE,
 )
 from opendbc.car.tesla.preap.constants import (
-  VDAS_EGO_JERK_MAX, VDAS_FUTURE_T_BP, VDAS_FUTURE_T_V,
+  VDAS_DECEL_JERK_MAX, VDAS_EGO_JERK_MAX, VDAS_FUTURE_T_BP, VDAS_FUTURE_T_V,
 )
 from opendbc.car.tesla.preap.virtual_das import FeedforwardModel, JerkLimiter, VirtualDAS
 from opendbc.car.tesla.preap.nap_conf import (
@@ -141,11 +141,33 @@ class TestJerkLimiter:
     for _ in range(120):
       accelerations.append(jl.update(1.0))
 
+    accelerations = np.array(accelerations)
     jerks = np.diff(accelerations) / dt
-    snaps = np.diff(np.concatenate(([0.0], jerks))) / dt
-    assert max(jerks) <= 1.0 + 1e-9
-    assert np.max(np.abs(snaps)) <= COMFORT_SNAP_MAX + 1e-9
+    # Easing off regen releases at the braking jerk with no comfort ramp; above zero the comfort
+    # jerk and snap limits still shape the launch.
+    releasing = accelerations[1:] <= 0.0
+    assert np.max(jerks[releasing]) <= VDAS_DECEL_JERK_MAX + 1e-9
+    positive = np.concatenate(([0.0], jerks[~releasing]))
+    assert np.max(jerks[~releasing]) <= 1.0 + 1e-9
+    assert np.max(np.abs(np.diff(positive) / dt)) <= COMFORT_SNAP_MAX + 1e-9
     assert accelerations[-1] == pytest.approx(1.0)
+
+  def test_easing_off_regen_releases_at_braking_jerk(self):
+    dt = 0.02
+    jl = JerkLimiter(dt=dt)
+    jl.reset(a_init=-0.6)
+    steps = 0
+    while jl.update(0.0) < 0.0:
+      steps += 1
+    assert steps * dt <= 0.3
+    assert jl.a_limited == 0.0
+
+  def test_partial_regen_release_lands_on_target(self):
+    jl = JerkLimiter(dt=0.02)
+    jl.reset(a_init=-0.8)
+    for _ in range(20):
+      jl.update(-0.3)
+    assert jl.a_limited == pytest.approx(-0.3)
 
   def test_positive_jerk_restarts_from_applied_hold_state(self):
     dt = 0.02
@@ -356,12 +378,16 @@ class TestVirtualDAS:
       limited_accelerations.append(vdas.jerk_limiter.a_limited)
       pedal_commands.append(previous_di)
 
+    limited_accelerations = np.array(limited_accelerations)
     jerks = np.diff(limited_accelerations) / dt
-    snaps = np.diff(np.concatenate(([pre_departure_jerk], jerks))) / dt
+    releasing = limited_accelerations[1:] <= 0.0
+    positive = np.concatenate(([0.0], jerks[~releasing]))
     pedal_steps = np.diff(pedal_commands)
 
-    assert np.max(jerks) <= 1.0 + 1e-9
-    assert np.max(np.abs(snaps)) <= COMFORT_SNAP_MAX + 1e-9
+    # regen releases at the braking jerk; the departure into positive accel stays S-curve shaped
+    assert np.max(jerks[releasing]) <= VDAS_DECEL_JERK_MAX + 1e-9
+    assert np.max(jerks[~releasing]) <= 1.0 + 1e-9
+    assert np.max(np.abs(np.diff(positive) / dt)) <= COMFORT_SNAP_MAX + 1e-9
     assert np.max(pedal_steps) < PEDAL_RAMP_RATE_UP - 1e-6
     assert limited_accelerations[-1] == pytest.approx(departure_target)
 
@@ -1511,3 +1537,13 @@ class TestVDASDomainBoundaries:
     assert vdas.a_ego_filter.x == pytest.approx(measured_acceleration, abs=0.01)
     assert vdas.prev_a_ego_filtered == pytest.approx(measured_acceleration, abs=0.01)
     assert vdas.jerk_limiter.a_limited == pytest.approx(0.0)
+
+
+def test_no_negative_trim_winds_up_past_the_regen_floor():
+  # Standard profile: full lift at -1.25. A -1.3 request that regen under-delivers must not bank
+  # hidden negative trim, which would keep regen on after the request eases.
+  vdas = VirtualDAS(dt=0.02)
+  for _ in range(250):
+    vdas.update(-1.3, v_ego=20.0, prev_pedal_di=vdas.prev_pedal_di, a_ego=-0.9,
+                freeze_integrator=False, regen_floor=-1.25)
+  assert vdas.inner_pid.i >= -1e-9

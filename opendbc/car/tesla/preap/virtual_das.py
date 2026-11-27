@@ -190,6 +190,13 @@ class JerkLimiter:
       applied_step = max(da, requested_jerk * self.dt)
       self.a_limited += applied_step
       self.j_limited = applied_step / self.dt
+    elif da > 1e-12 and self.a_limited < 0.0:
+      # Easing off regen releases as fast as braking applies, up to zero; lingering regen made the car
+      # drop below the lead's speed and then catch up (2026-11-26 drive). The comfort ramp below is for
+      # going into positive accel.
+      self.a_limited += min(da, self.j_decel_max * self.dt, -self.a_limited)
+      self.j_limited = 0.0
+      self.state = JerkLimiterState.IDLE
     else:
       if da > 1e-12:
         self.state = JerkLimiterState.POSITIVE_TRANSITION
@@ -521,13 +528,16 @@ class VirtualDAS:
         effort_min,
         previous_accel_effort - VDAS_DECEL_JERK_MAX * self.dt,
       )
+      # same release rate as the jerk limiter: easing off regen moves at the braking jerk
+      release_jerk = VDAS_DECEL_JERK_MAX if previous_accel_effort < 0.0 else VDAS_ACCEL_JERK_MAX
       shared_effort_max = min(
         effort_max,
-        previous_accel_effort + VDAS_ACCEL_JERK_MAX * self.dt,
+        previous_accel_effort + release_jerk * self.dt,
       )
     else:
       shared_effort_min, shared_effort_max = effort_min, effort_max
-    self.inner_pid.neg_limit = effort_min - base_accel_effort
+    # Full lift is reached at the profile floor: negative trim past it has no effect and would only wind up.
+    self.inner_pid.neg_limit = min(0.0, max(effort_min, regen_floor) - base_accel_effort)
     self.inner_pid.pos_limit = effort_max - base_accel_effort
     self.inner_pid.i = float(clip(
       self.inner_pid.i,
