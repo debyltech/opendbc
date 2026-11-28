@@ -1,7 +1,7 @@
 import pytest
 
 from opendbc.car.tesla.preap import coop_steering
-from opendbc.car.tesla.preap.coop_steering import DT, ENTRY_TIME, RELEASE_TIME, TORQUE_FULL, CoopSteering
+from opendbc.car.tesla.preap.coop_steering import BLEND_IN_TIME, DT, ENTRY_TIME, RELEASE_TIME, TORQUE_FULL, CoopSteering
 
 SPEED = 15.0  # m/s
 
@@ -64,7 +64,8 @@ def test_a_nudge_on_a_straight_follows_the_wheel_without_a_step():
     prev = out
   assert coop.blend == pytest.approx((1.5 - coop_steering.TORQUE_ON) / (TORQUE_FULL - coop_steering.TORQUE_ON))
   # with a full push the target is the wheel plus a lead in the push direction
-  full = coop.update(0.0, 5.0, TORQUE_FULL, SPEED, True, True)
+  for _ in range(int(BLEND_IN_TIME / DT) + 1):
+    full = coop.update(0.0, 5.0, TORQUE_FULL, SPEED, True, True)
   assert full > 5.0
   assert coop.update(0.0, -5.0, -TORQUE_FULL, SPEED, True, True) < -5.0
 
@@ -84,3 +85,11 @@ def test_disengaging_clears_the_blend():
   run(coop, 60, torque=TORQUE_FULL)
   coop.update(0.0, 0.0, 0.0, SPEED, False, True)
   assert coop.blend == 0.0
+
+
+def test_pushing_the_way_the_model_already_steers_never_holds_it_back():
+  coop = engaged_coop()
+  run(coop, 60, model=10.0, angle=5.0, torque=TORQUE_FULL)
+  assert coop.blend == 1.0
+  assert coop.update(10.0, 5.0, TORQUE_FULL, SPEED, True, True) == 10.0  # model is ahead in the push direction
+  assert coop.update(10.0, 5.0, -TORQUE_FULL, SPEED, True, True) < 5.0  # pushing against it still follows the hands

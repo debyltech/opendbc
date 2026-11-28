@@ -21,9 +21,12 @@ TORQUE_OFF = 0.5  # Nm; below it the blend decays back to the model
 ENTRY_TIME = 0.1  # s held above TORQUE_ON (EPAS torque updates at 25 Hz)
 STILL_RATE = 5.0  # deg/s; entry only from a nearly still wheel
 MIN_SPEED = 6.7  # m/s (15 mph)
-LEAD_DEG_PER_NM = 0.5  # follow target lead beyond TORQUE_ON, in the push direction (light; tune after on-car logs)
+# Follow target lead beyond TORQUE_ON, in the push direction. 0.5 deg/Nm (first drive, 2026-11-28) kept the rack about
+# 1 deg ahead of the hands, so the driver still did the work and hit the ~3.2 Nm abort within 0.4-0.8 s in 10 of 20 drops.
+LEAD_DEG_PER_NM = 2.0
 RELEASE_TIME = 1.0  # s for a full blend to decay back to the model
-TORQUE_TO_ANGLE_SIGN = 1.0  # positive steeringTorque turns steeringAngleDeg up: both are negated EPAS signals; logs mostly agree
+BLEND_IN_TIME = 0.2  # s for a full blend in, so entry with the larger lead has no step
+TORQUE_TO_ANGLE_SIGN = 1.0  # positive steeringTorque turns steeringAngleDeg up (both negated EPAS signals; confirmed 2026-11-28)
 
 
 class CoopSteering:
@@ -55,7 +58,9 @@ class CoopSteering:
       self._engaged = True
 
     if self._engaged and torque >= TORQUE_OFF:
-      self.blend = max(self.blend, float(np.clip((torque - TORQUE_ON) / (TORQUE_FULL - TORQUE_ON), 0.0, 1.0)))
+      want = float(np.clip((torque - TORQUE_ON) / (TORQUE_FULL - TORQUE_ON), 0.0, 1.0))
+      if want > self.blend:
+        self.blend = min(want, self.blend + DT / BLEND_IN_TIME)
     else:
       self.blend = max(0.0, self.blend - DT / RELEASE_TIME)
       if self.blend == 0.0 and torque < TORQUE_OFF:
@@ -63,4 +68,7 @@ class CoopSteering:
 
     lead = TORQUE_TO_ANGLE_SIGN * np.sign(driver_torque) * LEAD_DEG_PER_NM * max(0.0, torque - TORQUE_ON)
     follow = measured_angle + lead
+    # pushing the way the model already steers further: never hold the rack back behind it (7 of 20 drops on 2026-11-28)
+    if np.sign(driver_torque) * (model_angle - follow) > 0:
+      follow = model_angle
     return float((1.0 - self.blend) * model_angle + self.blend * follow)
