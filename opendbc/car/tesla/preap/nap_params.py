@@ -41,6 +41,7 @@ class NAPParamKeys:
 
   # Steering
   COOP_STEERING = "NAPCoopSteering"
+  LANE_CHANGE_BLINKER = "NAPLaneChangeBlinker"  # openpilot holds the turn signal through a lane change
   BRAKE_FACTOR = "NAPBrakeFactor"
 
   # Advanced
