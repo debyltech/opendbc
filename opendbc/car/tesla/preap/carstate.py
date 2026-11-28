@@ -116,10 +116,14 @@ def update_preap(cs, can_parsers):
   pedal_long_allowed = use_pedal and pedal_transform_valid
   long_control_allowed = (not use_pedal) or pedal_transform_valid
 
+  # Co-op braking: only read the params on the press frame, while pedal long is still engaged.
+  coop_brake = (cs.real_brake_pressed and cs.engagement.enableLongControl
+                and getattr(cs, 'coop_brake_window', False) and nap_conf.coop_braking)
   button_events = cs.engagement.process_buttons(
     cs.cruise_buttons, cs.prev_cruise_buttons, curr_time_ms,
     ret.vEgo, cs.speed_units, use_pedal, pedal_long_allowed,
-    long_control_allowed, cs.real_brake_pressed, cs.di_cruise_state)
+    long_control_allowed, cs.real_brake_pressed, cs.di_cruise_state,
+    coop_brake=coop_brake, a_ego=ret.aEgo)
   # Suppress brakePressed so generic brake-disengage path doesn't kill lateral
   ret.brakePressed = False
   ret.buttonEvents = button_events
@@ -167,6 +171,7 @@ def update_preap(cs, can_parsers):
     and cs.di_cruise_state not in ("STANDBY", "ENABLED")
   )
   ret.enableLongControl = bool(cs.engagement.enableLongControl)
+  ret.coopBrakePaused = bool(cs.engagement.coop_brake_paused)
   ret.pedalLongActive = bool(getattr(cs, 'pedal_authority_active', False)) and nap_conf.use_pedal
   ret.pedalAuthorityRequested = bool(getattr(cs, 'pedal_authority_requested', False))
   ret.pedalAuthorityState = int(getattr(cs, 'pedal_authority_state', 0)) & 0xFF

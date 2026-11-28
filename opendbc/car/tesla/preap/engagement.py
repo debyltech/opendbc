@@ -9,6 +9,12 @@ ButtonType = structs.CarState.ButtonEvent.Type
 CANCEL_ECHO_WINDOW_MS = 600
 SPOOF_ECHO_WINDOW_MS = 300
 
+# Co-op braking (NAPCoopBraking, Experimental only): a brake press while openpilot is already
+# slowing pauses pedal long and keeps the set speed; lifting off resumes, standstill included.
+COOP_BRAKE_PANIC_ACCEL = -4.5  # m/s^2; harder than this is a real override (logged co-op stops peak at -3.5)
+COOP_BRAKE_MOVING_TIMEOUT_MS = 20000  # brake held this long while moving: a real override
+COOP_BRAKE_MOVING_SPEED = 2.0  # m/s
+
 
 class PreAPEngagement:
   """Pre-AP engagement FSM: double-pull detection, target speed, brake override, CC spoof flags."""
@@ -37,6 +43,9 @@ class PreAPEngagement:
     self.preap_brake_pressed_prev = False
     self.last_stalk_non_cancel_ms = -10000
     self.prev_steering_disengage = False
+    self.coop_brake_paused = False
+    self.coop_brake_moving_ms = 0
+    self.prev_time_ms = 0
 
   def _drop_longitudinal_keep_lateral(self):
     was_long_active = self.enableLongControl
@@ -75,7 +84,9 @@ class PreAPEngagement:
 
   def process_buttons(self, cruise_buttons, prev_cruise_buttons, curr_time_ms,
                       v_ego, speed_units, use_pedal, pedal_long_allowed,
-                      long_control_allowed, real_brake_pressed, di_cruise_state="OFF"):
+                      long_control_allowed, real_brake_pressed, di_cruise_state="OFF",
+                      coop_brake=False, a_ego=0.0):
+    """coop_brake: the toggle is on, Experimental is on and openpilot was slowing; read on the press frame."""
     button_events = []
     long_control_allowed = long_control_allowed and (not use_pedal or not real_brake_pressed)
 
@@ -125,11 +136,45 @@ class PreAPEngagement:
     # brake that was already held before the stalk request.
     if use_pedal:
       if real_brake_pressed and self.cruiseEnabled and self.enableLongControl:
-        carlog.debug("BRAKE held — dropping longitudinal")
-        self._drop_longitudinal_keep_lateral()
+        if coop_brake:
+          carlog.debug("BRAKE inside the co-op window — pausing longitudinal")
+          self.enableLongControl = False
+          self.enableJustCC = True
+          self.pending_enable = False
+          self.coop_brake_paused = True
+          self.coop_brake_moving_ms = 0
+        else:
+          carlog.debug("BRAKE held — dropping longitudinal")
+          self._drop_longitudinal_keep_lateral()
+      elif self.coop_brake_paused:
+        self._update_coop_brake_pause(real_brake_pressed, curr_time_ms, v_ego, a_ego, pedal_long_allowed)
+    else:
+      self.coop_brake_paused = False
     self.preap_brake_pressed_prev = real_brake_pressed
+    self.prev_time_ms = curr_time_ms
 
     return button_events
+
+  def _update_coop_brake_pause(self, real_brake_pressed, curr_time_ms, v_ego, a_ego, pedal_long_allowed):
+    if not self.cruiseEnabled or self.enableLongControl or not self.enableJustCC:
+      self.coop_brake_paused = False  # cancelled, re-engaged by the stalk, or disengaged meanwhile
+    elif real_brake_pressed:
+      if v_ego > COOP_BRAKE_MOVING_SPEED:
+        self.coop_brake_moving_ms += curr_time_ms - self.prev_time_ms
+      if a_ego < COOP_BRAKE_PANIC_ACCEL or self.coop_brake_moving_ms > COOP_BRAKE_MOVING_TIMEOUT_MS:
+        carlog.debug("BRAKE co-op pause ended by a hard or long press — dropping longitudinal")
+        self.coop_brake_paused = False
+        self.pedal_speed_kph = 0.0
+        self.longCtrlEvent = "pccDisabled"
+    else:
+      self.coop_brake_paused = False
+      if pedal_long_allowed and not self.pedal_unavailable:
+        carlog.debug("BRAKE released — resuming co-op longitudinal at %.1f kph", self.pedal_speed_kph)
+        self.enableLongControl = True
+        self.enableJustCC = False
+        self.longCtrlEvent = "pccEnabled"
+      else:
+        self.pedal_speed_kph = 0.0
 
   def check_can_engage(self, door_open, gear_shifter, seatbelt_unlatched):
     """Check engagement prerequisites. Resets state if blocked."""

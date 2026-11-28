@@ -47,6 +47,8 @@ REGEN_DECEL_SHORTFALL_CLEAR = 0.15  # m/s²
 REGEN_COMMAND_TRIGGER_DI = -2.0  # command deep in the regen range
 REGEN_COMMAND_CLEAR_DI = -1.0
 REGEN_DECEL_REQUEST_TRIGGER = -1.0  # m/s²; only a real braking need, not settling to the set speed
+COOP_BRAKE_WINDOW_ACCEL = -0.4  # m/s²; openpilot slowing for something, not settling to the set speed
+COOP_BRAKE_WINDOW_FRAMES = 150  # 1.5 s at 100 Hz
 REGEN_DECEL_REQUEST_CLEAR = -0.2  # m/s²
 
 
@@ -204,6 +206,7 @@ class PreAPLongController:
     self.vdas = VirtualDAS(dt=0.02)
     self.pedal_authority = PedalAuthority()
     self.regen_decel_monitor = RegenDecelMonitor()
+    self.coop_brake_decel_frame = -COOP_BRAKE_WINDOW_FRAMES - 1
 
   @staticmethod
   def _handle_pedal_unavailable(CS):
@@ -240,6 +243,12 @@ class PreAPLongController:
         or getattr(CS, 'real_brake_pressed', False)
         or getattr(CS.out, 'gasPressed', False)):
       self.regen_decel_monitor.reset()
+
+    # Co-op braking window: openpilot asked to slow within the last 1.5 s. carstate reads it on the
+    # next brake press.
+    if long_active and (actuators.accel <= COOP_BRAKE_WINDOW_ACCEL or self.regen_decel_monitor.active):
+      self.coop_brake_decel_frame = frame
+    CS.coop_brake_window = frame - self.coop_brake_decel_frame <= COOP_BRAKE_WINDOW_FRAMES
 
     requested_long_rising = (not self.prev_requested_long) and requested_long
     if requested_long_rising:

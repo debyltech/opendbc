@@ -208,6 +208,13 @@ class NAPConf:
     return self._get_param_bool(NAPParamKeys.COOP_STEERING, 'coop_steering')
 
   @property
+  def coop_braking(self):
+    """Co-op braking toggle; only works in Experimental mode."""
+    if _PARAMS_AVAILABLE:
+      return _params.get_bool(NAPParamKeys.COOP_BRAKING) and _params.get_bool("ExperimentalMode")
+    return self._get('coop_braking', False)
+
+  @property
   def radar_enabled(self):
     return self._get_param_bool(NAPParamKeys.RADAR_ENABLED, 'radar_enabled')
 

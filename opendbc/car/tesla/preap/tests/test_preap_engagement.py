@@ -288,3 +288,71 @@ class TestNoPedalUpDownPassthrough(unittest.TestCase):
 
 if __name__ == "__main__":
   unittest.main()
+
+
+class TestCoopBraking(unittest.TestCase):
+  """A brake press inside the co-op window pauses pedal long; lifting off resumes at the same set speed."""
+
+  def setUp(self):
+    self.eng = PreAPEngagement(double_pull_enabled=False, double_pull_window_ms=750)
+    self.t = 1000
+    self.step(buttons=2)  # single-pull engage
+    self.step()
+    self.set_kph = self.eng.pedal_speed_kph
+    self.assertTrue(self.eng.enableLongControl and self.set_kph > 0)
+
+  def step(self, brake=False, coop=False, v=10.0, a=-1.0, buttons=0, dt=10):
+    self.t += dt
+    prev = getattr(self, '_prev_buttons', 0)
+    self._prev_buttons = buttons
+    self.eng.process_buttons(cruise_buttons=buttons, prev_cruise_buttons=prev, curr_time_ms=self.t, v_ego=v,
+                             speed_units="KPH", use_pedal=True, pedal_long_allowed=True, long_control_allowed=True,
+                             real_brake_pressed=brake, coop_brake=coop, a_ego=a)
+
+  def test_press_in_window_pauses_and_release_resumes_the_set_speed(self):
+    self.step(brake=True, coop=True)
+    self.assertTrue(self.eng.coop_brake_paused and self.eng.cruiseEnabled)
+    self.assertFalse(self.eng.enableLongControl)
+    for _ in range(100):
+      self.step(brake=True)  # coop is only read on the press frame
+    self.assertTrue(self.eng.coop_brake_paused)
+    self.step()
+    self.assertTrue(self.eng.enableLongControl)
+    self.assertFalse(self.eng.coop_brake_paused)
+    self.assertEqual(self.eng.pedal_speed_kph, self.set_kph)
+
+  def test_release_at_a_standstill_resumes(self):
+    self.step(brake=True, coop=True)
+    for _ in range(3000):  # 30 s waiting at a light
+      self.step(brake=True, v=0.0, a=0.0)
+    self.step(v=0.0, a=0.0)
+    self.assertTrue(self.eng.enableLongControl)
+
+  def test_press_outside_the_window_drops_as_before(self):
+    self.step(brake=True, coop=False)
+    self.assertFalse(self.eng.coop_brake_paused or self.eng.enableLongControl)
+    self.assertEqual(self.eng.pedal_speed_kph, 0.0)
+    self.step()
+    self.assertFalse(self.eng.enableLongControl)
+
+  def test_a_panic_brake_drops_and_release_does_not_resume(self):
+    self.step(brake=True, coop=True)
+    self.step(brake=True, a=-5.0)
+    self.assertFalse(self.eng.coop_brake_paused)
+    self.step()
+    self.assertFalse(self.eng.enableLongControl)
+    self.assertTrue(self.eng.cruiseEnabled)  # lateral stays
+
+  def test_a_long_press_while_moving_drops(self):
+    self.step(brake=True, coop=True)
+    for _ in range(2100):  # 21 s moving
+      self.step(brake=True, v=5.0)
+    self.step()
+    self.assertFalse(self.eng.enableLongControl)
+
+  def test_cancel_while_paused_does_not_resume(self):
+    self.step(brake=True, coop=True)
+    self.step(brake=True, buttons=1, dt=1000)  # CANCEL, past the echo window
+    self.step(brake=True)
+    self.step()
+    self.assertFalse(self.eng.cruiseEnabled or self.eng.enableLongControl or self.eng.coop_brake_paused)

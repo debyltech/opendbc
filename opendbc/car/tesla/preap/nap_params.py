@@ -38,6 +38,7 @@ class NAPParamKeys:
 
   # iBooster / Braking
   IBOOSTER_ENABLED = "NAPiBoosterEnabled"
+  COOP_BRAKING = "NAPCoopBraking"  # Experimental only: braking while openpilot slows pauses long, lifting off resumes
 
   # Steering
   COOP_STEERING = "NAPCoopSteering"
@@ -71,6 +72,7 @@ DEFAULTS = {
   NAPParamKeys.RADAR_EPAS_TYPE: 0,
   NAPParamKeys.RADAR_POSITION: 0,
   NAPParamKeys.IBOOSTER_ENABLED: False,
+  NAPParamKeys.COOP_BRAKING: False,
   NAPParamKeys.BRAKE_FACTOR: 1.0,
   NAPParamKeys.FORCE_PRE_AP: False,
 }

@@ -932,3 +932,20 @@ def test_regen_prompt_ignores_mild_decel_requests():
   for _ in range(3 * REGEN_DECEL_PROMPT_DWELL_UPDATES):
     assert not monitor.update(pedal_control_active=True, in_engage_grace=False, pedal_di=-5.0,
                               limited_accel=-0.8, actual_accel=-0.2, v_ego=15.0)
+
+
+def test_coop_brake_window_opens_on_a_decel_request_and_closes_after_1p5_seconds(controller_env):
+  controller, cc, cs, tesla_can = controller_env
+  _activate_longitudinal(cc, cs)
+  cc.actuators.accel = -0.2  # settling to the set speed: not a braking need
+  controller.update(cc, cs, frame=0, tesla_can=tesla_can, can_bus_party=0)
+  assert not cs.coop_brake_window
+
+  cc.actuators.accel = -0.6
+  controller.update(cc, cs, frame=1, tesla_can=tesla_can, can_bus_party=0)
+  assert cs.coop_brake_window
+  cc.actuators.accel = 0.3
+  controller.update(cc, cs, frame=151, tesla_can=tesla_can, can_bus_party=0)
+  assert cs.coop_brake_window
+  controller.update(cc, cs, frame=152, tesla_can=tesla_can, can_bus_party=0)
+  assert not cs.coop_brake_window

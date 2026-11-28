@@ -221,6 +221,7 @@ struct CarState {
   pedalCommandDi @76 :Float32;  # NAP: controller DI-domain command/seed; RESET wire frames carry zero
   pedalAuthorityFailed @77 :Bool;  # NAP: bounded pedal authority acquisition failed
   enableLongControl @78 :Bool;  # Pre-AP: FSM longitudinal intent; survives gas override
+  coopBrakePaused @79 :Bool;  # Pre-AP: a co-op brake press paused pedal long; lifting off resumes
 
   # cruise state
   cruiseState @10 :CruiseState;
